@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BossLoop — a strict boss and a crew that loops until the tests pass</title>
+  <meta name="description" content="BossLoop is a small multi-agent crew. The boss freezes the tests, the coder writes the module, the tester runs pytest, and they repeat until the suite is green." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,650&family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --bg: #14110e;
+      --bg-2: #1d1914;
+      --card: #241f19;
+      --line: #3c3429;
+      --ink: #f6f1e7;
+      --muted: #b3a794;
+      --boss: #e6b15a;
+      --coder: #6ec8c3;
+      --tester: #ef7d62;
+      --pass: #8fce93;
+      --fail: #ff6b6b;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: Outfit, sans-serif;
+      background:
+        radial-gradient(1200px 500px at 10% -10%, rgba(230, 177, 90, 0.16), transparent 55%),
+        radial-gradient(900px 400px at 100% 0%, rgba(110, 200, 195, 0.08), transparent 50%),
+        var(--bg);
+    }
+    a { color: var(--boss); }
+    button, .ghost {
+      font: inherit;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.55rem 0.95rem;
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--boss);
+      color: #2a2112;
+      border-color: transparent;
+      font-weight: 600;
+    }
+    button:disabled { opacity: 0.6; cursor: progress; }
+    header, main, footer { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1.5rem;
+      padding: 2.2rem 0 1rem;
+      align-items: end;
+    }
+    .kicker {
+      margin: 0;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--boss);
+      font-size: 0.75rem;
+    }
+    h1 {
+      font-family: Fraunces, serif;
+      font-weight: 650;
+      font-size: clamp(3rem, 7vw, 5.2rem);
+      line-height: 0.9;
+      margin: 0.2rem 0 0.4rem;
+    }
+    .lede { margin: 0; max-width: 38rem; color: var(--muted); font-size: 1.05rem; }
+    .status-block { display: flex; flex-direction: column; align-items: flex-end; gap: 0.7rem; }
+    .pill {
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid var(--line);
+      background: var(--bg-2);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.82rem;
+    }
+    .pill.done { color: var(--pass); border-color: #355c3a; }
+    .pill.failed { color: var(--fail); border-color: #6a3030; }
+    .pill.running { color: var(--boss); }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+    .rail {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.6rem;
+      margin: 1.2rem 0 1.4rem;
+    }
+    .station {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 0.8rem 0.9rem 0.9rem;
+      min-height: 92px;
+    }
+    .station strong { display: block; font-size: 1rem; }
+    .station span { color: var(--muted); font-size: 0.85rem; }
+    .station.active { outline: 2px solid var(--boss); }
+    .station.done { border-color: #4d6b48; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr);
+      gap: 1rem;
+      align-items: start;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 1rem 1.05rem 1.1rem;
+      box-shadow: var(--shadow);
+    }
+    .panel + .panel, .ticket + .ticket { margin-top: 0.75rem; }
+    .panel h2, .ticket h3 { margin: 0 0 0.45rem; font-size: 1rem; }
+    .task { white-space: pre-wrap; color: var(--ink); line-height: 1.45; }
+    .ticket {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-left: 6px solid var(--boss);
+      border-radius: 16px;
+      padding: 0.9rem 1rem 1rem;
+    }
+    .ticket.coder { border-left-color: var(--coder); }
+    .ticket.tester { border-left-color: var(--tester); }
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.75rem;
+      margin-bottom: 0.35rem;
+    }
+    .ticket h3 { font-family: Fraunces, serif; font-size: 1.35rem; font-weight: 560; }
+    .body { white-space: pre-wrap; line-height: 1.45; margin: 0; }
+    .badge {
+      display: inline-block;
+      margin-left: 0.4rem;
+      border: 1px solid var(--boss);
+      color: var(--boss);
+      border-radius: 999px;
+      padding: 0.05rem 0.45rem;
+      font-family: Outfit, sans-serif;
+      font-size: 0.72rem;
+    }
+    pre {
+      margin: 0;
+      padding: 0.8rem;
+      overflow: auto;
+      max-height: 340px;
+      background: #100e0b;
+      border-radius: 12px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.78rem;
+      line-height: 1.45;
+    }
+    ul { margin: 0.2rem 0 0; padding-left: 1.1rem; }
+    li { margin: 0.25rem 0; }
+    .case { display: flex; gap: 0.5rem; align-items: baseline; margin: 0.35rem 0; }
+    .mark { font-family: "IBM Plex Mono", monospace; font-size: 0.75rem; }
+    .mark.pass { color: var(--pass); }
+    .mark.fail { color: var(--fail); }
+    .scrub { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
+    .scrub button[aria-pressed="true"] { border-color: var(--coder); color: var(--coder); }
+    .empty { color: var(--muted); }
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      padding: 1.6rem 0 2.4rem;
+      color: var(--muted);
+    }
+    .error { color: var(--fail); }
+    @media (max-width: 860px) {
+      header, .layout, .status-block { display: block; }
+      .status-block { margin-top: 1rem; }
+      .actions, .status-block { justify-content: flex-start; align-items: flex-start; }
+      .rail { grid-template-columns: 1fr 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <p class="kicker">Team of workers · strict boss</p>
+      <h1>BossLoop</h1>
+      <p class="lede">The boss freezes the contract. The coder writes only the module. The tester runs pytest and reports the counts. They go around again until the suite is green, or the boss stops the run.</p>
+    </div>
+    <div class="status-block">
+      <div id="status-pill" class="pill">loading</div>
+      <div id="run-meta" class="empty"></div>
+      <div class="actions">
+        <button id="play" class="primary" type="button">Play the loop</button>
+        <button id="jump" type="button">Show the finish</button>
+        <button id="launch" type="button" hidden>Run the offline demo</button>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section class="rail" id="rail" aria-label="Crew stations"></section>
+    <section class="layout">
+      <div>
+        <article class="panel">
+          <h2>Work order</h2>
+          <div id="order" class="task"></div>
+        </article>
+        <div id="transcript" style="margin-top: 0.75rem"></div>
+      </div>
+      <aside>
+        <article class="panel">
+          <h2>Acceptance criteria</h2>
+          <ul id="criteria"></ul>
+        </article>
+        <article class="panel">
+          <h2>Module</h2>
+          <div id="scrub" class="scrub"></div>
+          <pre id="code"><code></code></pre>
+        </article>
+        <article class="panel">
+          <h2>Frozen tests</h2>
+          <pre id="tests"><code></code></pre>
+        </article>
+        <article class="panel">
+          <h2>Pytest</h2>
+          <div id="report"></div>
+        </article>
+      </aside>
+    </section>
+  </main>
+  <footer>
+    <div>Khaja Mujahiddin Mohammed</div>
+    <div>
+      <a href="https://portfolio-one-theta-71.vercel.app/">Portfolio</a>
+      ·
+      <a href="https://github.com/khajamujahid">GitHub</a>
+      ·
+      <a href="https://github.com/khajamujahid/multi-agent-team">Source</a>
+    </div>
+  </footer>
+  <script>
+    const stations = [
+      ["plan", "Boss", "Freeze the contract"],
+      ["code", "Coder", "Write the module"],
+      ["test", "Tester", "Run pytest"],
+      ["review", "Boss", "Accept or send it back"],
+    ];
+
+    let state = null;
+    let mode = "final";
+    let shown = 0;
+    let timer = null;
+    let pinnedIteration = null;
+
+    const pill = document.getElementById("status-pill");
+    const meta = document.getElementById("run-meta");
+    const rail = document.getElementById("rail");
+    const order = document.getElementById("order");
+    const transcript = document.getElementById("transcript");
+    const criteria = document.getElementById("criteria");
+    const scrub = document.getElementById("scrub");
+    const code = document.querySelector("#code code");
+    const tests = document.querySelector("#tests code");
+    const report = document.getElementById("report");
+
+    document.getElementById("play").addEventListener("click", () => {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduce) {
+        mode = "final";
+        render();
+        return;
+      }
+      stop();
+      mode = "play";
+      shown = 0;
+      pinnedIteration = null;
+      render();
+      timer = setInterval(() => {
+        if (!state || shown >= state.transcript.length) {
+          stop();
+          mode = "final";
+          render();
+          return;
+        }
+        shown += 1;
+        render();
+      }, 850);
+    });
+
+    document.getElementById("jump").addEventListener("click", () => {
+      stop();
+      mode = "final";
+      pinnedIteration = null;
+      render();
+    });
+
+    document.getElementById("launch").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      button.textContent = "The crew is working…";
+      stop();
+      try {
+        const response = await fetch("/api/runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ demo: true, max_iterations: 4 }),
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.detail || "The run failed to start.");
+        setState(body);
+      } catch (error) {
+        pill.className = "pill failed";
+        pill.textContent = "could not start";
+        meta.textContent = error.message;
+      } finally {
+        button.disabled = false;
+        button.textContent = "Run the offline demo";
+      }
+    });
+
+    function stop() {
+      if (timer) clearInterval(timer);
+      timer = null;
+    }
+
+    function visibleMessages() {
+      if (!state) return [];
+      if (mode === "final") return state.transcript;
+      return state.transcript.slice(0, shown);
+    }
+
+    function setState(next) {
+      state = next;
+      mode = "final";
+      shown = next.transcript.length;
+      pinnedIteration = null;
+      render();
+    }
+
+    function render() {
+      if (!state) return;
+      const messages = visibleMessages();
+      const finished = mode === "final";
+      const status = finished ? state.status : "running";
+      pill.className = "pill " + status;
+      pill.textContent = finished ? state.status : "in the loop";
+      meta.textContent = `${state.run_id} · ${state.provider} · iteration ${finished ? state.iteration : currentIteration(messages)} of ${state.max_iterations}`;
+      order.textContent = state.task;
+      renderRail(messages, finished);
+      renderTranscript(messages);
+      renderSide(messages, finished);
+    }
+
+    function currentIteration(messages) {
+      let iteration = 0;
+      for (const message of messages) iteration = Math.max(iteration, message.iteration || 0);
+      return iteration;
+    }
+
+    function renderRail(messages, finished) {
+      const seen = new Set(messages.map((message) => message.phase));
+      if (seen.has("done") || seen.has("failed")) seen.add("review");
+      const last = messages.length ? messages[messages.length - 1].phase : "plan";
+      const active = last === "done" || last === "failed" ? "review" : last;
+      rail.innerHTML = stations.map(([id, who, blurb]) => {
+        const classes = ["station"];
+        if (seen.has(id) && !(id === active && !finished)) classes.push("done");
+        if (id === active) classes.push("active");
+        return `<article class="${classes.join(" ")}"><span>${who}</span><strong>${label(id)}</strong><span>${blurb}</span></article>`;
+      }).join("");
+    }
+
+    function label(id) {
+      return { plan: "Plan", code: "Code", test: "Test", review: "Review" }[id] || id;
+    }
+
+    function renderTranscript(messages) {
+      if (!messages.length) {
+        transcript.innerHTML = `<article class="ticket"><p class="empty">The work order is on the bench. Press play.</p></article>`;
+        return;
+      }
+      transcript.innerHTML = messages.map((message) => {
+        const badge = message.override ? `<span class="badge">policy gate</span>` : "";
+        return `<article class="ticket ${message.agent}">
+          <div class="meta"><span>${message.agent}</span><span>iteration ${message.iteration}</span></div>
+          <h3>${escapeHtml(message.title)}${badge}</h3>
+          <p class="body">${escapeHtml(message.body)}</p>
+        </article>`;
+      }).join("");
+      const last = transcript.lastElementChild;
+      if (last && mode === "play") last.scrollIntoView({ block: "nearest" });
+    }
+
+    function renderSide(messages, finished) {
+      const planSeen = messages.some((message) => message.phase === "plan") || finished;
+      criteria.innerHTML = planSeen
+        ? (state.acceptance_criteria || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")
+        : `<li class="empty">The boss has not frozen the contract yet.</li>`;
+      tests.textContent = planSeen ? state.test_code : "Tests appear when the boss freezes them.";
+
+      const snaps = state.snapshots || [];
+      const revealed = snaps.filter((snap) => messages.some((message) => message.agent === "coder" && message.iteration === snap.iteration));
+      scrub.innerHTML = "";
+      if (!revealed.length) {
+        code.textContent = "The coder has not submitted a module yet.";
+        report.innerHTML = `<p class="empty">No pytest run yet.</p>`;
+        return;
+      }
+      if (pinnedIteration == null || !revealed.some((snap) => snap.iteration === pinnedIteration)) {
+        pinnedIteration = revealed[revealed.length - 1].iteration;
+      }
+      revealed.forEach((snap) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = `Iteration ${snap.iteration}${snap.report.passed ? " · green" : " · red"}`;
+        button.setAttribute("aria-pressed", String(snap.iteration === pinnedIteration));
+        button.addEventListener("click", () => {
+          pinnedIteration = snap.iteration;
+          renderSide(visibleMessages(), mode === "final");
+        });
+        scrub.appendChild(button);
+      });
+      const snap = revealed.find((item) => item.iteration === pinnedIteration) || revealed[revealed.length - 1];
+      const tested = messages.some((message) => message.agent === "tester" && message.iteration === snap.iteration);
+      code.textContent = snap.module_code;
+      if (!tested) {
+        report.innerHTML = `<p class="empty">Iteration ${snap.iteration} is written. The tester has not run it yet.</p>`;
+        return;
+      }
+      const lines = (snap.report.cases || []).map((item) => {
+        const mark = item.passed ? "pass" : "fail";
+        const word = item.passed ? "PASS" : "FAIL";
+        const detail = item.message ? `<div class="empty">${escapeHtml(item.message)}</div>` : "";
+        return `<div class="case"><span class="mark ${mark}">${word}</span><div><div>${escapeHtml(item.name)}</div>${detail}</div></div>`;
+      }).join("");
+      report.innerHTML = `<p><strong>${escapeHtml(snap.report.summary)}</strong></p>${lines}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[char]));
+    }
+
+    async function boot() {
+      const launch = document.getElementById("launch");
+      let live = false;
+      try {
+        const health = await fetch("/api/health");
+        live = health.ok;
+      } catch (error) {
+        live = false;
+      }
+      launch.hidden = !live;
+      try {
+        if (live) {
+          const response = await fetch("/api/runs");
+          if (response.ok) {
+            const runs = await response.json();
+            if (runs.length) {
+              setState(runs[0]);
+              return;
+            }
+          }
+        }
+        const sample = await fetch("sample_run.json");
+        if (!sample.ok) throw new Error("The recorded run is missing.");
+        setState(await sample.json());
+      } catch (error) {
+        pill.className = "pill failed";
+        pill.textContent = "unavailable";
+        order.textContent = error.message;
+      }
+    }
+
+    boot();
+  </script>
+</body>
+</html>
