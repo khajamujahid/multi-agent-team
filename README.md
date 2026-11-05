@@ -45,7 +45,9 @@ The tester executes the generated module on your machine, inside that run's work
 
 ## Live dashboard
 
-The hosted timeline replays a finished offline run, including the red first draft and the green second draft. The production URL is filled in once the Vercel project is live.
+The hosted timeline replays a finished offline run, including the red first draft and the green second draft:
+
+**https://multi-agent-team-virid.vercel.app**
 
 `bossloop dashboard` on your own machine is the interactive board. It can launch the offline crew and resume a checkpoint. The hosted page is the public replay, so it stays up with no API key and no long-running worker.
 
