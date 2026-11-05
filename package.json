@@ -1,0 +1,7 @@
+{
+  "name": "bossloop-dashboard",
+  "private": true,
+  "scripts": {
+    "build": "mkdir -p dist && cp -R site/. dist/"
+  }
+}

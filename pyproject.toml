@@ -1,0 +1,38 @@
+[project]
+name = "bossloop"
+version = "0.1.0"
+description = "A strict boss, a coder, and a tester. They loop until the tests pass."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Khaja Mujahiddin Mohammed" }]
+requires-python = ">=3.11"
+keywords = ["langgraph", "multi-agent", "pydantic", "pytest"]
+dependencies = [
+    "langgraph>=0.2.45",
+    "pydantic>=2.7",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "pytest>=8.0",
+]
+
+[project.urls]
+Homepage = "https://portfolio-one-theta-71.vercel.app/"
+Repository = "https://github.com/khajamujahid/multi-agent-team"
+Issues = "https://github.com/khajamujahid/multi-agent-team/issues"
+
+[project.scripts]
+bossloop = "bossloop.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
