@@ -3,5 +3,8 @@
   "framework": null,
   "installCommand": "npm install --ignore-scripts",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/health", "destination": "/api/health.json" }
+  ]
 }

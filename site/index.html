@@ -458,7 +458,10 @@
       let live = false;
       try {
         const health = await fetch("/api/health");
-        live = health.ok;
+        if (health.ok) {
+          const body = await health.json();
+          live = body.live_runs === true;
+        }
       } catch (error) {
         live = false;
       }
