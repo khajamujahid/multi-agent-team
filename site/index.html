@@ -249,6 +249,7 @@
       <a href="https://github.com/khajamujahid/multi-agent-team">Source</a>
     </div>
   </footer>
+  <script src="playback.js"></script>
   <script>
     const stations = [
       ["plan", "Boss", "Freeze the contract"],
@@ -262,6 +263,7 @@
     let shown = 0;
     let timer = null;
     let pinnedIteration = null;
+    let followLatest = true;
 
     const pill = document.getElementById("status-pill");
     const meta = document.getElementById("run-meta");
@@ -274,22 +276,30 @@
     const tests = document.querySelector("#tests code");
     const report = document.getElementById("report");
 
+    function enterFinishedPlayback() {
+      const done = playbackFinished();
+      mode = done.mode;
+      followLatest = done.followLatest;
+      pinnedIteration = done.pinnedIteration;
+    }
+
     document.getElementById("play").addEventListener("click", () => {
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      stop();
       if (reduce) {
-        mode = "final";
+        enterFinishedPlayback();
         render();
         return;
       }
-      stop();
+      followLatest = true;
+      pinnedIteration = null;
       mode = "play";
       shown = 0;
-      pinnedIteration = null;
       render();
       timer = setInterval(() => {
         if (!state || shown >= state.transcript.length) {
           stop();
-          mode = "final";
+          enterFinishedPlayback();
           render();
           return;
         }
@@ -300,8 +310,7 @@
 
     document.getElementById("jump").addEventListener("click", () => {
       stop();
-      mode = "final";
-      pinnedIteration = null;
+      enterFinishedPlayback();
       render();
     });
 
@@ -344,6 +353,7 @@
       state = next;
       mode = "final";
       shown = next.transcript.length;
+      followLatest = true;
       pinnedIteration = null;
       render();
     }
@@ -417,15 +427,18 @@
         report.innerHTML = `<p class="empty">No pytest run yet.</p>`;
         return;
       }
-      if (pinnedIteration == null || !revealed.some((snap) => snap.iteration === pinnedIteration)) {
-        pinnedIteration = revealed[revealed.length - 1].iteration;
-      }
+      pinnedIteration = chooseShownIteration(
+        revealed.map((snap) => snap.iteration),
+        pinnedIteration,
+        followLatest,
+      );
       revealed.forEach((snap) => {
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = `Iteration ${snap.iteration}${snap.report.passed ? " · green" : " · red"}`;
         button.setAttribute("aria-pressed", String(snap.iteration === pinnedIteration));
         button.addEventListener("click", () => {
+          followLatest = false;
           pinnedIteration = snap.iteration;
           renderSide(visibleMessages(), mode === "final");
         });
