@@ -106,6 +106,10 @@ def create_app() -> FastAPI:
     def index() -> FileResponse:
         return FileResponse(site_dir() / "index.html")
 
+    @app.get("/playback.js")
+    def playback_script() -> FileResponse:
+        return FileResponse(site_dir() / "playback.js", media_type="text/javascript")
+
     @app.get("/sample_run.json")
     def sample_file() -> FileResponse:
         path = site_dir() / "sample_run.json"

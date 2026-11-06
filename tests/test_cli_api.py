@@ -35,6 +35,9 @@ def test_dashboard_api_runs_the_demo(tmp_path, monkeypatch):
     page = client.get("/")
     assert page.status_code == 200
     assert "BossLoop" in page.text
+    script = client.get("/playback.js")
+    assert script.status_code == 200
+    assert "playbackFinished" in script.text
     started = client.post("/api/runs", json={"demo": True, "max_iterations": 4})
     assert started.status_code == 200
     body = started.json()
